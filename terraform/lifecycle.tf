@@ -19,9 +19,16 @@ resource "aws_s3_bucket_lifecycle_configuration" "listing_media_archive" {
     id     = "archive-sold-listing-photos"
     status = "Enabled"
 
+    filter {
+      and {
+        tags                     = { archive_eligible = "true" }
+        object_size_greater_than = 131000
+      }
+    }
+
     transition {
       days          = 30
-      storage_class = "GLACIER"
+      storage_class = "INTELLIGENT_TIERING"
     }
   }
 }
