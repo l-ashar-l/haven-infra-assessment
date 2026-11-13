@@ -124,5 +124,21 @@ def test_non_create_update_changes_are_ignored(tmp_path, capsys, change):
     assert "aws_s3_bucket.ignored" not in capsys.readouterr().out
 
 
+def test_repeated_untagged_address_is_printed_exactly_once(tmp_path, capsys):
+    untagged = {
+        "address": "aws_s3_bucket.repeated",
+        "type": "aws_s3_bucket",
+        "name": "repeated",
+        "change": {"actions": ["create"], "after": {"tags": {}}},
+    }
+    plan_path = _write_plan(tmp_path, [untagged, dict(untagged)])
+
+    exit_code = check_plan(plan_path)
+    out = capsys.readouterr().out
+
+    assert exit_code != 0
+    assert out.count("aws_s3_bucket.repeated") == 1
+
+
 def test_empty_plan_passes(tmp_path):
     assert check_plan(_write_plan(tmp_path, [])) == 0
