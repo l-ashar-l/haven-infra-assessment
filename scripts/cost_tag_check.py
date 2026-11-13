@@ -22,12 +22,55 @@ import json
 import sys
 
 
+REQUIRED_TAG = "landlord_account_id"
+CHECKED_ACTIONS = {"create", "update"}
+
+
+def _resources_missing_tag(plan: dict) -> list[str]:
+    """Return the addresses of created/updated resources lacking REQUIRED_TAG, in plan order."""
+    missing: list[str] = []
+    seen: set[str] = set()
+
+    for rc in plan.get("resource_changes", []):
+        change = rc.get("change") or {}
+        actions = set(change.get("actions") or [])
+        if not actions & CHECKED_ACTIONS:
+            continue
+
+        after = change.get("after")
+        if after is None:
+            # Nothing will exist after apply, so there is nothing to tag.
+            continue
+
+        tags = after.get("tags") or {}
+        if tags.get(REQUIRED_TAG):
+            continue
+
+        address = rc.get("address", "<unknown address>")
+        if address not in seen:
+            seen.add(address)
+            missing.append(address)
+
+    return missing
+
+
 def check_plan(plan_path: str) -> int:
     """
     Returns an exit code: 0 if every resource being created or updated has
     `landlord_account_id`, non-zero otherwise.
     """
-    raise NotImplementedError("Implement this.")
+    with open(plan_path) as f:
+        plan = json.load(f)
+
+    missing = _resources_missing_tag(plan)
+    if not missing:
+        print(f"OK: all created/updated resources carry `{REQUIRED_TAG}`.")
+        return 0
+
+    print(f"FAIL: {len(missing)} resource(s) missing required tag `{REQUIRED_TAG}`:")
+    for address in missing:
+        print(f"  - {address}")
+    return 1
 
 
 if __name__ == "__main__":
