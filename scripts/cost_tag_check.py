@@ -27,9 +27,8 @@ CHECKED_ACTIONS = {"create", "update"}
 
 
 def _resources_missing_tag(plan: dict) -> list[str]:
-    """Return the addresses of created/updated resources lacking REQUIRED_TAG, in plan order."""
-    missing: list[str] = []
-    seen: set[str] = set()
+    """Return the addresses of created/updated resources lacking REQUIRED_TAG, sorted."""
+    missing: set[str] = set()
 
     for rc in plan.get("resource_changes", []):
         change = rc.get("change") or {}
@@ -46,12 +45,9 @@ def _resources_missing_tag(plan: dict) -> list[str]:
         if tags.get(REQUIRED_TAG):
             continue
 
-        address = rc.get("address", "<unknown address>")
-        if address not in seen:
-            seen.add(address)
-            missing.append(address)
+        missing.add(rc.get("address", "<unknown address>"))
 
-    return missing
+    return sorted(missing)
 
 
 def check_plan(plan_path: str) -> int:

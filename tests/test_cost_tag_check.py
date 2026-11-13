@@ -28,6 +28,7 @@ SKIPPED = [
 
 
 def _write_plan(tmp_path: Path, resource_changes: list[dict]) -> str:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     plan_path = tmp_path / "plan.json"
     plan_path.write_text(json.dumps({"format_version": "1.2", "resource_changes": resource_changes}))
     return str(plan_path)
@@ -138,6 +139,43 @@ def test_repeated_untagged_address_is_printed_exactly_once(tmp_path, capsys):
 
     assert exit_code != 0
     assert out.count("aws_s3_bucket.repeated") == 1
+
+
+def test_untagged_replace_is_flagged(tmp_path, capsys):
+    plan_path = _write_plan(
+        tmp_path,
+        [
+            {
+                "address": "aws_s3_bucket.replaced",
+                "type": "aws_s3_bucket",
+                "name": "replaced",
+                "change": {
+                    "actions": ["delete", "create"],
+                    "after": {"tags": {"tenant_id": "ten-001"}},
+                },
+            }
+        ],
+    )
+
+    assert check_plan(plan_path) != 0
+    assert "aws_s3_bucket.replaced" in capsys.readouterr().out
+
+
+def test_reversed_plan_gives_identical_output(tmp_path, capsys):
+    resource_changes = json.loads(FIXTURE_PLAN.read_text())["resource_changes"]
+
+    forward_path = _write_plan(tmp_path / "forward", resource_changes)
+    reversed_path = _write_plan(tmp_path / "reversed", list(reversed(resource_changes)))
+
+    forward_code = check_plan(forward_path)
+    forward_out = capsys.readouterr().out
+    reversed_code = check_plan(reversed_path)
+    reversed_out = capsys.readouterr().out
+
+    assert forward_code == reversed_code != 0
+    assert forward_out == reversed_out
+    for address in MISSING_TAG:
+        assert forward_out.count(address) == 1
 
 
 def test_empty_plan_passes(tmp_path):
